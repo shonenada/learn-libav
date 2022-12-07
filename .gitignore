@@ -33,3 +33,6 @@
 
 .idea/
 cmake-build-debug/
+
+# ignore large file for now
+resources/demo.mp4
