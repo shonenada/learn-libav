@@ -9,8 +9,8 @@ if(UNIX)
     set(CMAKE_CXX_LINK_EXECUTABLE "${CMAKE_CXX_LINK_EXECUTABLE} -ldl")
 endif(UNIX)
 
-include_directories(${CMAKE_SOURCE_DIR}/includes)
-link_directories(${CMAKE_SOURCE_DIR}/libs)
+include_directories(${CMAKE_SOURCE_DIR}/includes/)
+link_directories(${CMAKE_SOURCE_DIR}/libs/)
 
 find_package(LIBAV REQUIRED)
 
