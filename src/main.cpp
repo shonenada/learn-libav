@@ -15,7 +15,7 @@ int main() {
 
     for(int i=0; i<pFormatContext->nb_streams; i++) {
         AVCodecParameters *pCP = pFormatContext->streams[i]->codecpar;
-        AVCodec *pCodec = avcodec_find_decoder(pCP->codec_id);
+        const AVCodec *pCodec = avcodec_find_decoder(pCP->codec_id);
 
         if (pCP->codec_type == AVMEDIA_TYPE_VIDEO) {
             std::cout << "Video Codec: resolution " << pCP->width << "x" << pCP->height << " " << std::endl;
