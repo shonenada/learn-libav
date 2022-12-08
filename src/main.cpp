@@ -6,23 +6,129 @@ extern "C" {
 }
 
 #include "helpers.h"
+#include "log.h"
 
 int main() {
+    int rc;
     std::string filename("demo.mp4");
+
+    logging("init containers");
     AVFormatContext *pFormatContext = avformat_alloc_context();
-    avformat_open_input(&pFormatContext, filename.c_str(), NULL, NULL);
-    avformat_find_stream_info(pFormatContext, NULL);
 
-    for(int i=0; i<pFormatContext->nb_streams; i++) {
-        AVCodecParameters *pCP = pFormatContext->streams[i]->codecpar;
-        const AVCodec *pCodec = avcodec_find_decoder(pCP->codec_id);
-
-        if (pCP->codec_type == AVMEDIA_TYPE_VIDEO) {
-            std::cout << "Video Codec: resolution " << pCP->width << "x" << pCP->height << " " << std::endl;
-        } else if (pCP->codec_type == AVMEDIA_TYPE_AUDIO) {
-            std::cout << "Audio Codec: " << pCP->channels << " channels, sample rate: " << pCP->sample_rate << std::endl;
-        }
+    if (!pFormatContext) {
+        logging("[ERROR] can not allocate memory for AVFormatContext");
+        return -1;
     }
 
-    DumpAVFormat(pFormatContext);
+    rc = avformat_open_input(&pFormatContext, filename.c_str(), NULL, NULL);
+    if (rc != 0) {
+        logging("[ERROR] can not open input file: %s, return code: %d", filename.c_str(), rc);
+        return -1;
+    }
+
+    rc = avformat_find_stream_info(pFormatContext, NULL);
+    if (rc != 0) {
+        logging("[ERROR] can not find stream info, return code: %d", rc);
+        return -1;
+    }
+
+    logging("[INFO] Opened file %s.\nFormat: %s\nDuration: %lld\nBitRate: %lld\n",
+            filename.c_str(), pFormatContext->iformat->long_name, pFormatContext->duration, pFormatContext->bit_rate);
+
+    AVCodec *pCodec = NULL;
+    AVCodecParameters *pCodecParameters = NULL;
+    int video_stream_index = -1;
+
+    for(int i=0; i<pFormatContext->nb_streams; i++) {
+        AVCodecParameters *pLocalCP = pFormatContext->streams[i]->codecpar;
+
+//        logging("  AVStream->time_base before open coded %d/%d", pFormatContext->streams[i]->time_base.num,
+//                pFormatContext->streams[i]->time_base.den);
+//        logging("  AVStream->r_frame_rate before open coded %d/%d", pFormatContext->streams[i]->r_frame_rate.num,
+//                pFormatContext->streams[i]->r_frame_rate.den);
+//        logging("  AVStream->start_time %" PRId64, pFormatContext->streams[i]->start_time);
+//        logging("  AVStream->duration %" PRId64, pFormatContext->streams[i]->duration);
+
+        AVCodec *pLocalCodec = avcodec_find_decoder(pLocalCP->codec_id);
+
+        if (pLocalCodec == NULL) {
+            logging("[ERROR] Unsupported codec: %s", pLocalCP->codec_id);
+            continue;
+        }
+
+        if (pLocalCP->codec_type == AVMEDIA_TYPE_VIDEO) {
+            if (video_stream_index == -1) {
+                video_stream_index = i;
+                pCodec = pLocalCodec;
+                pCodecParameters = pLocalCP;
+            }
+
+            logging("[INFO] Video Codec. resolution: %d x %d", pLocalCP->width, pLocalCP->height);
+        } else if (pLocalCP->codec_type == AVMEDIA_TYPE_AUDIO) {
+            logging("[INFO] Audio Codec. %d channels, sample rate: %d", pLocalCP->channels, pLocalCP->sample_rate);
+        }
+        logging("\tCodec %s ID %d bit_rate %lld", pLocalCodec->name, pLocalCodec->id, pLocalCP->bit_rate);
+    }
+
+    if (video_stream_index == -1) {
+        logging("[INFO] file %s does no contain video stream", filename.c_str());
+        return 0;
+    }
+
+    AVCodecContext *pCodecContext = avcodec_alloc_context3(pCodec);
+    if (!pCodecContext) {
+        logging("[ERROR] failed to allocate memory for AVCodecContext");
+        return -1;
+    }
+
+    rc = avcodec_parameters_to_context(pCodecContext, pCodecParameters);
+    if (rc < 0) {
+        logging("[ERROR] failed to copy codec params to codec context");
+        return -1;
+    }
+
+    rc = avcodec_open2(pCodecContext, pCodec, NULL);
+    if (rc < 0) {
+        logging("[ERROR] failed to open codec");
+        return -1;
+    }
+
+    AVFrame *pFrame = av_frame_alloc();
+    if (!pFrame) {
+        logging("[ERROR] failed to allocate memory for AVFrame");
+        return -1;
+    }
+
+    AVPacket *pPacket = av_packet_alloc();
+    if (!pPacket) {
+        logging("[ERROR] failed to allocate memory for AVPacket");
+        return -1;
+    }
+
+    int how_many_packets_to_process = 8;
+
+    while (av_read_frame(pFormatContext, pPacket) >= 0) {
+
+        if (pPacket->stream_index == video_stream_index) {
+            logging("AVPacket->pts %d", pPacket->pts);
+            rc = Decode(pCodecContext, pPacket, pFrame);
+            if (rc < 0) {
+                logging("[ERROR] failed to decode");
+                break;
+            }
+            if (--how_many_packets_to_process <= 0) break;
+        }
+        av_packet_unref(pPacket);
+
+//        std::cout
+//            << "Frame " << av_get_picture_type_char(pFrame->pict_type) << "(" << pCodecContext->frame_number << ") "
+//            << "pts: " << pFrame->pts << "; "
+//            << "dts: " << pFrame->pkt_dts << "; "
+//            << "key_frame: " << pFrame->key_frame << "; "
+//            << "[coded_picture_number " << pFrame->coded_picture_number << ", "
+//            << "[display_picture_number " << pFrame->display_picture_number << "]"
+//            << std::endl;
+    }
+
+//    DumpAVFormat(pFormatContext);
 }
