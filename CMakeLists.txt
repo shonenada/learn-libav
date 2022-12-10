@@ -26,5 +26,8 @@ endif()
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources/demo.mp4 DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
-add_executable(learn_libav src/main.cpp)
-target_link_libraries(learn_libav ${LIBS})
+add_executable(parse_video src/parse_video.cpp)
+target_link_libraries(parse_video ${LIBS})
+
+add_executable(decode_encode src/decode_encode.cpp)
+target_link_libraries(decode_encode ${LIBS})
