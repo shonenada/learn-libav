@@ -100,7 +100,7 @@ int main() {
 
     rc = avformat_write_header(output_format_context, &opts);
     if (rc < 0) {
-        logging("[ERROR] Error occurred when opening output file\n");
+        logging("[ERROR] Error occurred when writing header");
         goto end;
     }
     debug("wrote headers: %s", output_filename.c_str());
@@ -150,7 +150,7 @@ end:
     avformat_free_context(output_format_context);
     av_freep(&streams_list);
     if (rc < 0 && rc != AVERROR_EOF) {
-        logging("[ERROR] Error occurred: %s\n", av_err2string(rc).c_str());
+        logging("[ERROR] Error occurred: %s", av_err2string(rc).c_str());
         return -1;
     }
 
