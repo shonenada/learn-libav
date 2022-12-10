@@ -42,13 +42,6 @@ int main() {
     for(int i=0; i<pFormatContext->nb_streams; i++) {
         AVCodecParameters *pLocalCP = pFormatContext->streams[i]->codecpar;
 
-//        logging("  AVStream->time_base before open coded %d/%d", pFormatContext->streams[i]->time_base.num,
-//                pFormatContext->streams[i]->time_base.den);
-//        logging("  AVStream->r_frame_rate before open coded %d/%d", pFormatContext->streams[i]->r_frame_rate.num,
-//                pFormatContext->streams[i]->r_frame_rate.den);
-//        logging("  AVStream->start_time %" PRId64, pFormatContext->streams[i]->start_time);
-//        logging("  AVStream->duration %" PRId64, pFormatContext->streams[i]->duration);
-
         AVCodec *pLocalCodec = avcodec_find_decoder(pLocalCP->codec_id);
 
         if (pLocalCodec == NULL) {
@@ -108,9 +101,8 @@ int main() {
     int how_many_packets_to_process = 8;
 
     while (av_read_frame(pFormatContext, pPacket) >= 0) {
-
         if (pPacket->stream_index == video_stream_index) {
-            logging("AVPacket->pts %d", pPacket->pts);
+            logging("AVPacket->pts %d" PRId64, pPacket->pts);
             rc = Decode(pCodecContext, pPacket, pFrame);
             if (rc < 0) {
                 logging("[ERROR] failed to decode");
@@ -120,15 +112,6 @@ int main() {
         }
         av_packet_unref(pPacket);
 
-//        std::cout
-//            << "Frame " << av_get_picture_type_char(pFrame->pict_type) << "(" << pCodecContext->frame_number << ") "
-//            << "pts: " << pFrame->pts << "; "
-//            << "dts: " << pFrame->pkt_dts << "; "
-//            << "key_frame: " << pFrame->key_frame << "; "
-//            << "[coded_picture_number " << pFrame->coded_picture_number << ", "
-//            << "[display_picture_number " << pFrame->display_picture_number << "]"
-//            << std::endl;
     }
-
-//    DumpAVFormat(pFormatContext);
+    return 0;
 }

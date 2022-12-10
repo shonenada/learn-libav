@@ -18,6 +18,20 @@ void DumpAVFormat(AVFormatContext *pCtx) {
     << std::endl;
 }
 
+void save_grey_frame(unsigned char* buff, int wrap, int xsize, int ysize, char* filename) {
+    FILE *f;
+    f = fopen(filename, "w");
+
+    // header of file pgm
+    fprintf(f, "P5\n%d %d\n%d\n", xsize, ysize, 255);
+
+    for (int i=0; i < ysize; i++) {
+        fwrite(buff + i * wrap, 1, xsize, f);
+    }
+
+    fclose(f);
+}
+
 av_always_inline std::string av_err2string(int errnum) {
     char str[AV_ERROR_MAX_STRING_SIZE];
     return av_make_error_string(str, AV_ERROR_MAX_STRING_SIZE, errnum);
@@ -50,6 +64,13 @@ int Decode(AVCodecContext *pCodecContext, AVPacket *pPacket, AVFrame *pFrame) {
                 pFrame->key_frame,
                 pFrame->coded_picture_number
             );
+
+            char frame_filename[1024];
+            snprintf(frame_filename, sizeof(frame_filename), "%s-%d.pgm", "frame", pCodecContext->frame_number);
+            if (pFrame->format != AV_PIX_FMT_YUV420P) {
+                logging("Warning: format of frame is not AV_PIX_FMT_YUV420P");
+            }
+            save_grey_frame(pFrame->data[0], pFrame->linesize[0], pFrame->width, pFrame->height, frame_filename);
         }
     }
     return 0;
