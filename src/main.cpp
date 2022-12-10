@@ -102,7 +102,7 @@ int main() {
 
     while (av_read_frame(pFormatContext, pPacket) >= 0) {
         if (pPacket->stream_index == video_stream_index) {
-            logging("AVPacket->pts %d" PRId64, pPacket->pts);
+            logging("AVPacket->pts %" PRId64, pPacket->pts);
             rc = Decode(pCodecContext, pPacket, pFrame);
             if (rc < 0) {
                 logging("[ERROR] failed to decode");
