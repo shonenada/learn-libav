@@ -209,6 +209,7 @@ int prepare_audio_encoder(StreamingContext *sc, int sample_rate, StreamingParams
     sc->audio_avcc->channel_layout = av_get_default_channel_layout(OUTPUT_CHANNELS);
     sc->audio_avcc->sample_rate = sample_rate;
     sc->audio_avcc->sample_fmt = sc->audio_avc->sample_fmts[0];
+    sc->audio_avcc->bit_rate = OUTPUT_BIT_RATE;
     sc->audio_avcc->time_base = (AVRational) {1, sample_rate};
     sc->audio_avcc->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
 
@@ -271,13 +272,21 @@ int encode_video(StreamingContext *decoder, StreamingContext *encoder, AVFrame *
 }
 
 int encode_audio(StreamingContext *decoder, StreamingContext *encoder, AVFrame *input_frame) {
+    debug("call encode_audio");
+
     AVPacket *output_packet = av_packet_alloc();
     if (!output_packet) {
         logging("[ERROR] could not allocate memory for output AVPacket");
         return -1;
     }
+    debug("allocate memory for output packet");
 
     int rc = avcodec_send_frame(encoder->audio_avcc, input_frame);
+    if (rc < 0) {
+        debug("nb_samples: %d; frame_size: %d", input_frame->nb_samples, encoder->audio_avcc->frame_size);
+        logging("[ERROR] failed to send frame to encoder: %s", av_err2string(rc).c_str());
+        return -1;
+    }
     while (rc >= 0) {
         rc = avcodec_receive_packet(encoder->audio_avcc, output_packet);
         if (rc == AVERROR(EAGAIN) || rc == AVERROR_EOF) {
@@ -330,6 +339,8 @@ int transcode_video(StreamingContext *decoder, StreamingContext *encoder, AVPack
 }
 
 int transcode_audio(StreamingContext *decoder, StreamingContext *encoder, AVPacket *input_packet, AVFrame *input_frame) {
+    debug("transcode audio");
+
     int rc = avcodec_send_packet(decoder->audio_avcc, input_packet);
     if (rc < 0) {
         logging("[ERROR] Error while sending packet to decoder: %s", av_err2string(rc).c_str());
@@ -339,6 +350,7 @@ int transcode_audio(StreamingContext *decoder, StreamingContext *encoder, AVPack
     while (rc >= 0) {
         rc = avcodec_receive_frame(decoder->audio_avcc, input_frame);
         if (rc == AVERROR(EAGAIN) || rc == AVERROR_EOF) {
+            debug("break as rc in (EAGAIN, AVERROR_EOF)");
             break;
         } else if (rc < 0) {
             logging("[ERROR] Error while receiving frame from decoder: %s", av_err2string(rc).c_str());
@@ -347,6 +359,7 @@ int transcode_audio(StreamingContext *decoder, StreamingContext *encoder, AVPack
 
         if (rc >= 0) {
             if (encode_audio(decoder, encoder, input_frame)) {
+                logging("[ERROR] failed to encode audio");
                 return -1;
             }
             av_frame_unref(input_frame);
@@ -464,6 +477,7 @@ int main() {
     }
 
     debug("copy audio if need: %d", sp.copy_audio);
+    debug(">>>> framerate %d; bit rate: %d", decoder->audio_avcc->framerate, decoder->audio_avcc->bit_rate);
     if (!sp.copy_audio) {
         if (prepare_audio_encoder(encoder, decoder->audio_avcc->sample_rate, sp)) {
             return -1;
@@ -518,6 +532,7 @@ int main() {
         debug("times: %d", times);
         times += 1;
         if (decoder->avfc->streams[input_packet->stream_index]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+            debug("handle video: %d", sp.copy_video);
             if (!sp.copy_video) {
                 if (transcode_video(decoder, encoder, input_packet, input_frame)) {
                     return -1;
@@ -529,6 +544,7 @@ int main() {
                 }
             }
         } else if (decoder->avfc->streams[input_packet->stream_index]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+            debug("handle audio: %d", sp.copy_audio);
             if (!sp.copy_audio) {
                 if (transcode_audio(decoder, encoder, input_packet, input_frame)) {
                     return -1;
