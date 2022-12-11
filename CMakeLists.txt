@@ -31,3 +31,6 @@ target_link_libraries(parse_video ${LIBS})
 
 add_executable(decode_encode src/decode_encode.cpp)
 target_link_libraries(decode_encode ${LIBS})
+
+add_executable(transcoding src/transcoding.cpp)
+target_link_libraries(transcoding ${LIBS})
